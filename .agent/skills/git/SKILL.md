@@ -10,191 +10,64 @@ example: feat(client): add git mode commit guards
 
 # Git commits
 
-## Priority hierarchy
+Git-mode **execution contract** (status verify, diff prefetch, final bullet list) lives in the engine and the git system prompt — this skill defines **commit conventions** and overrides only.
 
-When rules conflict, follow this order (higher wins):
+## Priority (when rules conflict)
 
-1. **User instruction this turn** — what they asked for now (e.g. "commit all", "English only", "split separately", "do not push").
-2. **Recent repo history** — last 5–10 commits from `git log` (language, prefix types, scopes, tone).
-3. **Other project git skills** — additional files under `.agent/skills/git/` or with `modes: git`.
-4. **Defaults in this skill** — `commit_types`, scope hint, examples in frontmatter.
+1. **User instruction this turn** — e.g. "commit all", "English only", "split separately", "do not push".
+2. **Recent `git log`** — last 5–10 commits (language, prefixes, scopes, tone).
+3. **Other project git skills** — `.agent/skills/git/` or `modes: git`.
+4. **Frontmatter below** — `commit_types`, scope, example.
 
-When the user asks for a **target language** for messages (e.g. translate commits to English), use that language for all new or rewritten messages this turn — even if older commits in `git log` are in another language.
+User-requested target language overrides log language for new messages this turn.
 
 ## Inspect vs mutate
 
-Infer from the user's intent — not from keywords or language.
+Infer from intent — not keywords.
 
-**Inspect** — user wants to understand the working tree (what changed, whether something is needed):
-
-- Read-only git: `git status`, `git diff`, `git log`.
-- Reply in action `"answer"` with findings.
-- Do **not** run `git add`, `git commit`, or `git push`.
-
-**Mutate** — user explicitly asked for version-control actions (commit, split commits, rewrite messages, push, stash, branch):
-
-- Follow execution order and planning sections below.
-- **Do not ask again** with option menus (commit / delete / something else) — the request is already clear.
-- **Do not use ask_user** for git confirmations — proceed with slices or report blockers in action `"answer"`.
+- **Inspect:** `git status`, `git diff`, `git log` → action `"answer"` with findings. No `add`/`commit`/`push`.
+- **Mutate:** user asked for commits, split, rewrite, push, stash, branch → run git; no ask_user or option menus.
 
 ## Push
 
-Do not run `git push` automatically after commit — only when the user asked to push in this dialog (or another project git skill says otherwise).
+No `git push` unless the user asked in this dialog (unless another git skill says otherwise).
 
-## Execution order (mutate only)
+## Mutate workflow (summary)
 
-1. `git status --short` — list every dirty path (engine may prefetch batched diffs automatically — see **Batched diff inspection**).
-2. `git log -10 --oneline` (or `git log -10`) — **read before writing any commit message.** Note the repo's language, prefix pattern, scopes, and tone (unless the user specified a target language this turn).
-3. Plan slices — logical commit groups before staging (see **Planning commit slices**).
-4. Per slice: `git add` (specific paths) → `git commit -m "…"` — engine runs `git status --short` after each commit and lists any remaining paths; continue slices while paths remain.
-5. **Verify before answer** — see **Finish mutating git**; do not push unless the user asked in this dialog.
+1. `git status --short` — every dirty path.
+2. `git log -10` — read before first commit message.
+3. Plan slices; per slice: `git add` (specific paths) → `git commit -m "…"`.
+4. Engine verifies tree after commits — continue while paths remain; answer only when status is clean.
+5. Batch diffs (`git diff --stat`, `git diff -- path1 path2 …`) — never per-file diff loops.
 
-## Engine-owned steps (do not duplicate)
+**Commit all:** every path from step 1 must reach `git commit` before answer.
 
-The engine may run these **without** an LLM turn — use the injected results:
+**Separate commits:** one concern per slice; never `git add -A` / `git add .`; specific paths only.
 
-| Step | When | Your job |
-| --- | --- | --- |
-| **Diff prefetch** | After your `git status --short` | Plan slices from batched `--stat` / `git diff --` output — no per-file diff loops |
-| **Status verify** | After each your `git commit` | If paths remain, engine lists them — next JSON must be `git add` + `git commit` for the next slice, not action `"answer"` |
-| **Auto-finish** | After status verify shows **empty** tree | Engine may emit the final commit list — only when every path from step 1 was committed |
+## Rewrite existing messages
 
-**Commit all:** every path from the initial `git status --short` must reach `git commit` before action `"answer"`. Partial completion is forbidden — if engine lists remaining paths, continue slicing.
+- Run `git log` before and after; report only **after** hashes/messages.
+- HEAD: `git commit --amend -m "…"`.
+- Last N: non-interactive rebase (`GIT_SEQUENCE_EDITOR` / `GIT_EDITOR`). Report errors — do not invent hashes.
 
-## Batched diff inspection
+## Final answer (commits)
 
-**Do not** run `git diff <one-file>` in a loop — that wastes turns and hits the read-only git budget.
-
-After `git status --short`, the engine may prefetch batched diffs for you (`--stat`, staged/unstaged path batches, untracked). **Use those results** for slice planning.
-
-When you run diff yourself (inspect-only turns, or prefetch missed a path):
-
-1. `git diff --stat` and `git diff --cached --stat` first.
-2. One command for many paths: `git diff -- path1 path2 path3 …` (up to ~8 paths per call).
-3. Never per-file diff loops — batch by slice or by size.
-
-If 20 files changed, two or three batched `git diff -- …` calls beat twenty single-file calls.
-
-## Finish mutating git (any operation)
-
-After **any** mutating git command this turn (`add`, `commit`, `rebase`, `stash`, `merge`, `checkout`, `reset`, …):
-
-1. Run `git status --short` (or `-s`) — **must be empty** before action `"answer"`. Plain `git status` does not count.
-2. If history changed (`commit`, `rebase`, …): run `git log -N --oneline` and report per **Report results**.
-
-**Commit all / everything:** when the user asked to commit all changes, every path from the initial `git status` must reach `git commit` (in one or several slices). Partial completion + answer is **forbidden** — e.g. 8 files dirty, 4 committed, 4 left → continue, do not answer.
-
-This applies to commits, rebases, stashes, and other git work — not only `git commit`.
-
-## Planning commit slices
-
-**«Отдельно» / «separately» = separate logical concerns** (not necessarily one file — per-file commits are fine if that is the slice).
-
-Before the first `git add`, run `git status --short` and list **every** dirty path.
-
-1. Group paths that belong to one concern (optional — for cleaner history).
-2. `git add` → `git commit` per slice until **status is empty**.
-3. After **each** commit: `git status --short` — if any path remains, continue; **never answer while paths remain** when the user asked to commit.
-
-**Wrong:** user asked to commit all / everything, you committed some files and answered while others are still in `git status --short`.
-
-**OK:** one file per commit, as long as **every** dirty path was committed before answer.
-
-### Example (multi-file git-mode work)
-
-| Slice | Paths (one `git add`) | Message idea |
-| --- | --- | --- |
-| Skill docs | `docs/templates/.../SKILL.md`, `client/src/shared/git-commit-conventions.ts` | docs + default skill sync |
-| Turn guards | `client/src/shared/agent-turn-guards.ts`, `client/src/shared/agent-turn-guards.test.ts` | guards + tests |
-| Agent loop wiring | `client/src/main/lib/agent/agent-loop.ts`, `agent-context.ts`, `agent-tool-runner.ts`, `agent-types.ts` | engine git slice gates |
-| Workflow prompt | `client/src/shared/workflow-mode.ts` | git session prompt line |
-
-When the user asked to split into separate commits:
-
-- One concern per commit — never one commit for unrelated areas (e.g. agent loop, shared guards, skill docs = separate commits).
-- Stage **specific paths only** — never `git add -A`, `git add .`, or `git add --all`.
-- Separate `git add` + `git commit` per slice.
-- After each commit run `git status --short`; while changes remain, start the next slice.
-- Each message describes that slice only; one language/style — never mix languages in one message.
-
-## Rewrite commit messages (history)
-
-When the user asks to rename, reword, or translate **existing** commits:
-
-- This is **mutate** — run real git commands; **never** claim success from memory or prior turns.
-- Run `git log -N --oneline` **before** and **after**; report only hashes and messages from the **after** log.
-- **HEAD only:** `git commit --amend -m "new message"`.
-- **Last N commits:** use non-interactive history rewrite (`git rebase -i HEAD~N` with `GIT_SEQUENCE_EDITOR` / `GIT_EDITOR`, or another non-interactive flow). If rebase fails, report the error in action `"answer"` — do not invent hashes.
-- After rewrite, run `git log -N --oneline` and confirm each target commit shows the new message before saying "updated".
-
-## Report results (final answer after mutate)
-
-**Always:** confirm step 1 in **Finish mutating git** (clean `git status --short`).
-
-**When commits were created or rewritten this turn:**
-
-1. Run `git log -N --oneline` (N = number of commits this turn).
-2. Reply with **only** a bullet list — one line per commit, **message then short hash**, copied from that log output.
-
-**Required format (every commit):**
+Bullet list only — one line per commit from `git log`:
 
 - `feat(client): add git mode commit guards` — `ab12cd3`
-- `fix(client): block ask_user in git mode` — `c4e5f67`
 
-Rules:
+Full message + short hash; no prose «готово» without the list. Never invent hashes.
 
-- **Full commit message** (not a paraphrase) + **short hash** from `git log` — same order on every line.
-- **One commit** → still one bullet line (not prose like «создан коммит…»).
-- **Several commits** → one bullet per commit; no extra summary before the list unless the user asked for context.
-- **Forbidden:** summary without the list — e.g. `успешно закоммичены`, `закоммитил отдельно`, `все изменения закоммичены` **without** message + hash on each line.
-- Never invent hashes — only lines present in `git log` output.
+## Message format
 
-Non-commit git work (stash, branch, etc.): brief factual line — what ran and `git status` result; no fake commit list.
-
-Keep the answer concise; no push unless the user asked.
-
-## Message format — match `git log`
-
-**Always read `git log` before the first commit.** Your messages should look like they belong in that history — not like a generic template.
-
-### One language, one style
-
-- Pick **one language** (user instruction overrides when they asked for a target language).
-- Pick **one prefix pattern** from the log (e.g. `feat:` everywhere, or no prefix at all — follow the repo).
-- Pick scope usage from the log (always `(client)`, sometimes, or never).
-- Write in the same tone (imperative, past tense, sentence case — mirror what you see).
-
-### Forbidden
-
-- **Mixed languages in one message** — e.g. `feat: actualizar обработку коммits`.
-- **Filename-only summaries** — the message must describe the change, not repeat the path.
-- **Copying examples from this skill file** when `git log` shows a different style — frontmatter `example` is fallback only.
-- **Inventing a new style** when history is available — parrot the repo, do not improvise.
-
-### Good workflow
-
-1. Scan `git log -10` — note dominant language and format (unless user specified target language).
-2. Draft each slice message in **that** language and **that** format.
-3. Re-read before `git commit` — would this message fit between the last 10 commits? If not, rewrite.
-
-### Other rules
-
-- Short one-line summary for **this slice only**.
+- Read `git log` before the first commit; match repo style (language, prefix, scope, tone).
+- One language per message; no mixed languages.
+- Describe the change — not the filename alone.
 - No Cursor attribution trailers.
-- **Never ask the user to write or fix commit messages** — adjust from `git log` and retry yourself.
+- Never ask the user to write messages — adjust from log and retry.
 
-### Illustrative (do not copy — adapt to your repo's `git log`)
-
-If log shows `feat(client): add git mode commit guards` → write similar English `feat(client): …` messages.
-
-If log shows `fix: исправлен роутинг моделей` → write similar Russian `fix: …` messages.
-
-If log shows no prefix, only `Обновлён skill git` → do not add `feat:` just because this skill mentions it.
+Frontmatter `example` is fallback only when log is empty or ambiguous.
 
 ## More git skills
 
-Add files under `.agent/skills/git/` (or `.agent/skills/` with `modes: git`).
-
-## Frontmatter
-
-- `commit_types`, `commit_scope`, `commit_min_summary_chars`, `commit_message_pattern`, `example`
+Add under `.agent/skills/git/` or `.agent/skills/` with `modes: git`.

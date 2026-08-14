@@ -1,0 +1,52 @@
+---
+id: git-commits
+modes: git
+priority: 10
+commit_types: feat, fix, refactor, test, docs, chore
+commit_scope: client
+commit_language: en
+commit_min_summary_chars: 4
+example: feat(client): add git mode commit guards
+---
+
+# Git commits
+
+Split work into logical slices — one concern per commit.
+
+## Message format
+
+- Prefix: feat | fix | refactor | test | docs | chore
+- Optional scope in parentheses, e.g. `(client)`
+- Short one-line summary (English by default)
+- No vague folder summaries like "changes in components"
+
+## Examples
+
+- `feat(client): add git mode commit guards`
+- `fix: handle provider billing errors`
+- `chore(client): bump version`
+
+## More git skills
+
+Add additional files under `.agent/skills/git/` (or anywhere under `.agent/skills/` with `modes: git`).
+
+Examples:
+
+- `.agent/skills/git/branches/SKILL.md` — branch naming / merge policy
+- `.agent/skills/release-git/SKILL.md` with `modes: git` — release tagging workflow
+
+## Frontmatter
+
+Shared skill fields:
+
+- `id` — stable skill name in prompts
+- `modes` — comma-separated workflow modes (`git`, `code`, `plan`, …)
+- `priority` — higher loads first when multiple skills match
+
+Commit validation fields (optional, first matching skill wins):
+
+- `commit_types`, `commit_scope`, `commit_language`, `commit_min_summary_chars`
+- `commit_message_pattern` — custom regex override
+- `example` — sample commit message
+
+If no skill defines commit fields, Alpha uses the engine default conventional commit style.

@@ -46,8 +46,20 @@ Do not run `git push` automatically after commit — only when the user asked to
 1. `git status --short` — list every dirty path (engine may prefetch batched diffs automatically — see **Batched diff inspection**).
 2. `git log -10 --oneline` (or `git log -10`) — **read before writing any commit message.** Note the repo's language, prefix pattern, scopes, and tone (unless the user specified a target language this turn).
 3. Plan slices — logical commit groups before staging (see **Planning commit slices**).
-4. Per slice: `git add` (specific paths) → `git commit -m "…"` → `git status --short` → next slice if needed.
+4. Per slice: `git add` (specific paths) → `git commit -m "…"` — engine runs `git status --short` after each commit and lists any remaining paths; continue slices while paths remain.
 5. **Verify before answer** — see **Finish mutating git**; do not push unless the user asked in this dialog.
+
+## Engine-owned steps (do not duplicate)
+
+The engine may run these **without** an LLM turn — use the injected results:
+
+| Step | When | Your job |
+| --- | --- | --- |
+| **Diff prefetch** | After your `git status --short` | Plan slices from batched `--stat` / `git diff --` output — no per-file diff loops |
+| **Status verify** | After each your `git commit` | If paths remain, engine lists them — next JSON must be `git add` + `git commit` for the next slice, not action `"answer"` |
+| **Auto-finish** | After status verify shows **empty** tree | Engine may emit the final commit list — only when every path from step 1 was committed |
+
+**Commit all:** every path from the initial `git status --short` must reach `git commit` before action `"answer"`. Partial completion is forbidden — if engine lists remaining paths, continue slicing.
 
 ## Batched diff inspection
 

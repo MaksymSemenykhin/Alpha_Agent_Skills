@@ -43,11 +43,25 @@ Do not run `git push` automatically after commit — only when the user asked to
 
 ## Execution order (mutate only)
 
-1. `git status`, `git diff`, staged diffs.
+1. `git status --short` — list every dirty path (engine may prefetch batched diffs automatically — see **Batched diff inspection**).
 2. `git log -10 --oneline` (or `git log -10`) — **read before writing any commit message.** Note the repo's language, prefix pattern, scopes, and tone (unless the user specified a target language this turn).
 3. Plan slices — logical commit groups before staging (see **Planning commit slices**).
 4. Per slice: `git add` (specific paths) → `git commit -m "…"` → `git status --short` → next slice if needed.
 5. **Verify before answer** — see **Finish mutating git**; do not push unless the user asked in this dialog.
+
+## Batched diff inspection
+
+**Do not** run `git diff <one-file>` in a loop — that wastes turns and hits the read-only git budget.
+
+After `git status --short`, the engine may prefetch batched diffs for you (`--stat`, staged/unstaged path batches, untracked). **Use those results** for slice planning.
+
+When you run diff yourself (inspect-only turns, or prefetch missed a path):
+
+1. `git diff --stat` and `git diff --cached --stat` first.
+2. One command for many paths: `git diff -- path1 path2 path3 …` (up to ~8 paths per call).
+3. Never per-file diff loops — batch by slice or by size.
+
+If 20 files changed, two or three batched `git diff -- …` calls beat twenty single-file calls.
 
 ## Finish mutating git (any operation)
 

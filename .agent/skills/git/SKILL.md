@@ -14,7 +14,7 @@ example: feat(client): add git mode commit guards
 
 When rules conflict, follow this order (higher wins):
 
-1. **User instruction this turn** — what they asked for now (e.g. "English only", "split separately", "do not push").
+1. **User instruction this turn** — what they asked for now (e.g. "commit all", "English only", "split separately", "do not push").
 2. **Recent repo history** — last 5–10 commits from `git log` (language, prefix types, scopes, tone).
 3. **Other project git skills** — additional files under `.agent/skills/git/` or with `modes: git`.
 4. **Defaults in this skill** — `commit_types`, scope hint, examples in frontmatter.
@@ -53,28 +53,26 @@ Do not run `git push` automatically after commit — only when the user asked to
 
 After **any** mutating git command this turn (`add`, `commit`, `rebase`, `stash`, `merge`, `checkout`, `reset`, …):
 
-1. Run `git status --short` — **must be empty** before action `"answer"`. If not empty, continue the git workflow; do not claim success.
-2. If history changed (`commit`, `rebase`, `cherry-pick`, `revert`, `merge`, `reset`): run `git log -N --oneline` and report hash + message **only** from that output (see **Report results**).
+1. Run `git status --short` (or `-s`) — **must be empty** before action `"answer"`. Plain `git status` does not count.
+2. If history changed (`commit`, `rebase`, …): run `git log -N --oneline` and report per **Report results**.
 
-This applies equally to commits, rebases, stashes, and other git work — not only `git commit`.
+**Commit all / everything:** when the user asked to commit all changes, every path from the initial `git status` must reach `git commit` (in one or several slices). Partial completion + answer is **forbidden** — e.g. 8 files dirty, 4 committed, 4 left → continue, do not answer.
+
+This applies to commits, rebases, stashes, and other git work — not only `git commit`.
 
 ## Planning commit slices
 
-**«Отдельно» / «separately» = separate logical concerns — NOT one commit per file.**
+**«Отдельно» / «separately» = separate logical concerns** (not necessarily one file — per-file commits are fine if that is the slice).
 
-Before the first `git add`, plan all slices from `git diff` / `git status`:
+Before the first `git add`, run `git status --short` and list **every** dirty path.
 
-1. List every changed path.
-2. Group paths that belong to one concern (same feature, same module, code + its tests, template + embedded default).
-3. One `git add path1 path2 …` per group — multiple paths in one add when they share a concern.
-4. After the last slice, `git status --short` must be empty before action `"answer"`.
+1. Group paths that belong to one concern (optional — for cleaner history).
+2. `git add` → `git commit` per slice until **status is empty**.
+3. After **each** commit: `git status --short` — if any path remains, continue; **never answer while paths remain** when the user asked to commit.
 
-**Default:** group **related** files into one commit (same module, same feature, code + its tests).
+**Wrong:** user asked to commit all / everything, you committed some files and answered while others are still in `git status --short`.
 
-- **Wrong:** one commit per file when files belong to the same concern.
-- **Wrong:** stopping after partial commits while `git status --short` still lists paths.
-- **Wrong:** messages that only name a path (`update agent-loop.ts`, `файл foo.ts`) — describe the **change**, not the filename.
-- **One file per commit** only when the user explicitly asked for per-file commits, or only one path remains for an unrelated concern.
+**OK:** one file per commit, as long as **every** dirty path was committed before answer.
 
 ### Example (multi-file git-mode work)
 
@@ -122,7 +120,7 @@ Rules:
 - **Full commit message** (not a paraphrase) + **short hash** from `git log` — same order on every line.
 - **One commit** → still one bullet line (not prose like «создан коммит…»).
 - **Several commits** → one bullet per commit; no extra summary before the list unless the user asked for context.
-- **Forbidden:** vague reports without the list (`обновил коммиты`, `закоммитил отдельно`) when hashes/messages are missing.
+- **Forbidden:** summary without the list — e.g. `успешно закоммичены`, `закоммитил отдельно`, `все изменения закоммичены` **without** message + hash on each line.
 - Never invent hashes — only lines present in `git log` output.
 
 Non-commit git work (stash, branch, etc.): brief factual line — what ran and `git status` result; no fake commit list.

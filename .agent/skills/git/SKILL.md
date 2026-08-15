@@ -5,69 +5,73 @@ priority: 10
 commit_types: feat, fix, refactor, test, docs, chore
 commit_scope: client
 commit_min_summary_chars: 4
+commit_language: en
 example: feat(client): add git mode commit guards
+author_name: Alpha Agent
+author_email: AlphaAgent@example.com
 ---
 
 # Git commits
 
-Git-mode **execution contract** (status verify, diff prefetch, final bullet list) lives in the engine and the git system prompt — this skill defines **commit conventions** and overrides only.
+## Priority hierarchy
+1. User instruction this turn.
+2. Recent repo history (last 5–10 commits).
+3. Other project git skills.
+4. Defaults in this skill.
 
-## Priority (when rules conflict)
-
-1. **User instruction this turn** — e.g. "commit all", "English only", "split separately", "do not push".
-2. **Recent `git log`** — last 5–10 commits (language, prefixes, scopes, tone).
-3. **Other project git skills** — `.agent/skills/git/` or `modes: git`.
-4. **Frontmatter below** — `commit_types`, scope, example.
-
-User-requested target language overrides log language for new messages this turn.
+When a target language is specified, use it for all new or rewritten messages.
 
 ## Inspect vs mutate
-
-Infer from intent — not keywords.
-
-- **Inspect:** `git status`, `git diff`, `git log` → action `"answer"` with findings. No `add`/`commit`/`push`.
-- **Mutate:** user asked for commits, split, rewrite, push, stash, branch → run git; no ask_user or option menus.
+- **Inspect**: Read-only actions (e.g., `git status`, `git diff`, `git log`).
+- **Mutate**: User explicitly requests version-control actions (e.g., commit, push).
 
 ## Push
+Only run `git push` if explicitly requested.
 
-No `git push` unless the user asked in this dialog (unless another git skill says otherwise).
+## Execution order (mutate only)
+1. `git status --short`.
+2. `git log -10 --oneline`.
+3. Plan slices.
+4. For each slice: `git add` → `git commit -m "..."`.
+5. Verify before answer.
 
-## Mutate workflow (summary)
+## Engine-owned steps
+| Step | When | Your job |
+| --- | --- | --- |
+| **Diff prefetch** | After `git status --short` | Plan slices from batched output. |
+| **Status verify** | After each commit | If paths remain, list them. |
+| **Auto-finish** | After empty tree | Emit final commit list. |
 
-1. `git status --short` — every dirty path.
-2. `git log -10` — read before first commit message.
-3. Plan slices; per slice: `git add` (specific paths) → `git commit -m "…"`.
-4. Engine verifies tree after commits — continue while paths remain; answer only when status is clean.
-5. Batch diffs (`git diff --stat`, `git diff -- path1 path2 …`) — never per-file diff loops.
+## Commit all
+All paths from initial `git status --short` must reach `git commit`.
 
-**Commit all:** every path from step 1 must reach `git commit` before answer.
+## Batched diff inspection
+- Avoid per-file diff loops.
+- Use `git diff --stat` and batch paths.
 
-**Separate commits:** one concern per slice; never `git add -A` / `git add .`; specific paths only.
+## Finish mutating git
+1. Run `git status --short` — must be empty.
+2. If history changed, run `git log -N --oneline`.
 
-## Rewrite existing messages
+## Planning commit slices
+1. Group paths by concern.
+2. `git add` → `git commit` per slice until empty.
+3. After each commit, check status.
 
-- Run `git log` before and after; report only **after** hashes/messages.
-- HEAD: `git commit --amend -m "…"`.
-- Last N: non-interactive rebase (`GIT_SEQUENCE_EDITOR` / `GIT_EDITOR`). Report errors — do not invent hashes.
+## Rewrite commit messages
+- Run `git log -N --oneline` before and after.
+- Use `git commit --amend` for HEAD only.
+- Use non-interactive history rewrite for last N commits.
 
-## Final answer (commits)
-
-Bullet list only — one line per commit from `git log`:
-
-- `feat(client): add git mode commit guards` — `ab12cd3`
-
-Full message + short hash; no prose «готово» without the list. Never invent hashes.
+## Report results
+1. Confirm clean `git status --short`.
+2. List commits in required format.
 
 ## Message format
-
-- Read `git log` before the first commit; match repo style (language, prefix, scope, tone).
-- One language per message; no mixed languages.
-- Describe the change — not the filename alone.
-- No Cursor attribution trailers.
-- Never ask the user to write messages — adjust from log and retry.
-
-Frontmatter `example` is fallback only when log is empty or ambiguous.
+- Summary language follows `commit_language` in frontmatter.
+- Match `git log` prefix/scope style.
+- One language, one style.
+- Avoid mixed languages and filename-only summaries.
 
 ## More git skills
-
-Add under `.agent/skills/git/` or `.agent/skills/` with `modes: git`.
+Add files under `.agent/skills/git/` or `.agent/skills/` with `modes: git`.

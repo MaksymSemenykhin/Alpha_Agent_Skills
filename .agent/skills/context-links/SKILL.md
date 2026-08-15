@@ -1,19 +1,51 @@
 ---
 id: context-links
-modes: code
+modes: code, plan, run, git, analysis, ask
 priority: 8
 ---
 
-# Связи проекта (project context links)
+# Связи проекта
 
-**Engine contract** — read-only Связи snapshot, `manage_context_link` tool shape, and when to call are injected by the client in Code mode. This file is for **project-specific hints only** (below the marker).
+Память о том, какие **задачи и сущности** ведут к **каким файлам**. Хранится в `.agent/context/entity-links.json`, показывается в разделе **Связи** и в system prompt (снимок связей на этот ход).
 
-## Customize for this project
+## Когда вызывать manage_context_link
 
-Add rules below — the engine does not overwrite this section:
+Только если пользователь **явно** просит изменить память:
 
-- Where stage constants live (e.g. `moduls/stageIds.js`)
-- Typical js/sql pairs for your filters
-- Entity names that repeat across tasks
+- запомнить / усилить / связать задачу с файлом;
+- убрать / ослабить / забыть связь;
+- зафиксировать пару файлов, которые всегда идут вместе.
+
+**Не вызывай** после каждой правки — движок сам усиливает связи после успешного поиска и `edit_file`.
+
+**manage_context_link доступен только в Code mode.** В ask / plan / run / git / analysis инструмент заблокирован: предложи **Code** или страницу **Связи**.
+
+## Форма вызова
+
+Не переопределяй контракт движка:
+
+- **action** — `confirm` (усилить) или `reject` (ослабить / убрать);
+- **targets** — массив, в каждом элементе:
+  - **entityKeys** — обычно один ключ, например `modify:stage_x` из идентификатора в промпте;
+  - **artifactPath** — путь из недавнего `search_text`, `read_file` или снимка Связей (не выдумывай);
+  - **pairedArtifactPath** (опционально) — второй файл для пары js↔sql и т.п.
+
+## Три вида связей
+
+1. **Задача → файл** — ключ из идентификатора (`modify:…`) + путь из контекста.
+2. **Сущность → файл** — имя сущности + один путь.
+3. **Пара файлов** — `artifactPath` + `pairedArtifactPath`.
+
+## Примеры
+
+| Пользователь | Действие |
+|--------------|----------|
+| «Запомни, что stage_x — это filters/a.js» | confirm — ключ из идентификатора, путь из контекста |
+| «Убери связь filters/old.js» | reject — путь из Связей или недавнего поиска |
+| «Эти два файла всегда вместе» | confirm с парой путей |
+
+## Настройка под этот проект
+
+Допиши правила ниже — движок эту секцию не перезаписывает:
 
 <!-- project-specific hints -->

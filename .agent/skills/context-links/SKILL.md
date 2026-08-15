@@ -6,37 +6,28 @@ priority: 8
 
 # Project context links (Связи)
 
-Persistent memory in `.agent/context/entity-links.json`: **keys** (entities, task patterns like `modify:…`, etc.) and **files** wired together. Read-only snapshot is already in the system prompt; UI: **Связи**.
+Project memory: **associations** the engine stores between named things — entities, task patterns (`modify:…`), symbols, repo paths, multi-endpoint pairs, and whatever else the project records. File: `.agent/context/entity-links.json`. UI: **Связи**.
 
-## When to call manage_context_link
+## Modes
 
-User **explicitly** asks to **change** stored links.
+| | All modes | Code mode |
+|---|-----------|-----------|
+| Read links (prompt snapshot, search boost) | yes | yes |
+| Agent changes links (`manage_context_link`) | no | yes |
+| User changes links (**Связи** page) | yes | yes |
 
-- `confirm` — add or raise trust
-- `reject` — lower trust or drop
+Use memory in every mode. Do not re-search for paths the snapshot already gives you.
 
-No routine calls after search/edit — engine reinforces automatically.
+## manage_context_link
 
-`manage_context_link` runs in **Code mode** only (engine rejects it elsewhere). In other modes: user edits **Связи** in the UI — do not call the tool.
+Call only in **Code mode**, only when the user **explicitly** asks to change memory.
 
-## Targets (mix in one call)
+- `confirm` — store or strengthen a link
+- `reject` — weaken or remove a link
 
-Each target: `entityKeys[]`, `artifactPath`, optional `pairedArtifactPath`. Paths from recent tools or the Связи snapshot — never invent.
+Skip after normal search/edit turns — the engine reinforces links on its own.
 
-| Shape | Fields |
-|-------|--------|
-| Key(s) → file | `entityKeys` + `artifactPath` |
-| File ↔ file | `artifactPath` + `pairedArtifactPath` (pair can also carry `entityKeys`) |
-
-One `entityKeys` entry can be a bare entity, a task pattern, or several keys for the same file.
-
-## Examples
-
-| User intent | Action |
-|-------------|--------|
-| Save / keep this mapping | confirm |
-| Drop / stop using this mapping | reject |
-| Two files belong together | confirm + `pairedArtifactPath` |
+Send `targets[]` per the engine/tool contract (`entityKeys`, `artifactPath`, optional `pairedArtifactPath`). Map the user’s wording (entity↔entity, entity↔file, file↔file, task↔symbols, several keys at once) onto those fields using evidence from the Связи snapshot or recent tool output — never invent endpoints.
 
 ## Project-specific rules
 

@@ -4,48 +4,40 @@ modes: code, plan, run, git, analysis, ask
 priority: 8
 ---
 
-# Связи проекта
+# Project context links (Связи)
 
-Память о том, какие **задачи и сущности** ведут к **каким файлам**. Хранится в `.agent/context/entity-links.json`, показывается в разделе **Связи** и в system prompt (снимок связей на этот ход).
+Persistent memory in `.agent/context/entity-links.json`: **keys** (entities, task patterns like `modify:…`, etc.) and **files** wired together. Read-only snapshot is already in the system prompt; UI: **Связи**.
 
-## Когда вызывать manage_context_link
+## When to call manage_context_link
 
-Только если пользователь **явно** просит изменить память:
+User **explicitly** asks to **change** stored links.
 
-- запомнить / усилить / связать задачу с файлом;
-- убрать / ослабить / забыть связь;
-- зафиксировать пару файлов, которые всегда идут вместе.
+- `confirm` — add or raise trust
+- `reject` — lower trust or drop
 
-**Не вызывай** после каждой правки — движок сам усиливает связи после успешного поиска и `edit_file`.
+No routine calls after search/edit — engine reinforces automatically.
 
-**manage_context_link доступен только в Code mode.** В ask / plan / run / git / analysis инструмент заблокирован: предложи **Code** или страницу **Связи**.
+**Code mode only**; otherwise point to **Code** or **Связи**.
 
-## Форма вызова
+## Targets (mix in one call)
 
-Не переопределяй контракт движка:
+Each target: `entityKeys[]`, `artifactPath`, optional `pairedArtifactPath`. Paths from recent tools or the Связи snapshot — never invent.
 
-- **action** — `confirm` (усилить) или `reject` (ослабить / убрать);
-- **targets** — массив, в каждом элементе:
-  - **entityKeys** — обычно один ключ, например `modify:stage_x` из идентификатора в промпте;
-  - **artifactPath** — путь из недавнего `search_text`, `read_file` или снимка Связей (не выдумывай);
-  - **pairedArtifactPath** (опционально) — второй файл для пары js↔sql и т.п.
+| Shape | Fields |
+|-------|--------|
+| Key(s) → file | `entityKeys` + `artifactPath` |
+| File ↔ file | `artifactPath` + `pairedArtifactPath` (pair can also carry `entityKeys`) |
 
-## Три вида связей
+One `entityKeys` entry can be a bare entity, a task pattern, or several keys for the same file.
 
-1. **Задача → файл** — ключ из идентификатора (`modify:…`) + путь из контекста.
-2. **Сущность → файл** — имя сущности + один путь.
-3. **Пара файлов** — `artifactPath` + `pairedArtifactPath`.
+## Examples
 
-## Примеры
+| User intent | Action |
+|-------------|--------|
+| Save / keep this mapping | confirm |
+| Drop / stop using this mapping | reject |
+| Two files belong together | confirm + `pairedArtifactPath` |
 
-| Пользователь | Действие |
-|--------------|----------|
-| «Запомни, что stage_x — это filters/a.js» | confirm — ключ из идентификатора, путь из контекста |
-| «Убери связь filters/old.js» | reject — путь из Связей или недавнего поиска |
-| «Эти два файла всегда вместе» | confirm с парой путей |
-
-## Настройка под этот проект
-
-Допиши правила ниже — движок эту секцию не перезаписывает:
+## Project-specific rules
 
 <!-- project-specific hints -->

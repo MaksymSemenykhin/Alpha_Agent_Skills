@@ -17,7 +17,7 @@ User **explicitly** asks to **change** stored links.
 
 No routine calls after search/edit — engine reinforces automatically.
 
-**Code mode only**; otherwise point to **Code** or **Связи**.
+`manage_context_link` runs in **Code mode** only (engine rejects it elsewhere). In other modes: user edits **Связи** in the UI — do not call the tool.
 
 ## Targets (mix in one call)
 

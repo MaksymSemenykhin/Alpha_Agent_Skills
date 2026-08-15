@@ -1,6 +1,6 @@
 ---
-id: project-context-links
-modes: code
+id: context-links
+modes: code, plan, run, git, analysis, ask
 priority: 8
 ---
 

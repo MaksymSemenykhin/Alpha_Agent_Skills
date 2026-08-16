@@ -1,11 +1,14 @@
 ---
 id: multilingual-search
+namespaced_id: alpha.multilingual-search
 modes: code, plan, run, ask, troubleshoot, analysis
 priority: 7
 tools: multilingual_search
 ---
 
 # multilingual_search
+
+Project skill diagnostic name: **alpha.multilingual-search**. Runtime tool contract: `multilingual_search`.
 
 Read-only expanded project search for natural-language terms across supported languages.
 

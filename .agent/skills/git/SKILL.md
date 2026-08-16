@@ -1,5 +1,6 @@
 ---
 id: git-commits
+namespaced_id: alpha.git-commits
 modes: git
 priority: 10
 commit_types: feat, fix, refactor, test, docs, chore
@@ -12,6 +13,8 @@ author_email: AlphaAgent@example.com
 ---
 
 # Git commits
+
+Project skill diagnostic name: **alpha.git-commits**. Runtime surface: git workflow guidance, not a runtime tool rename.
 
 ## Priority hierarchy
 1. User instruction this turn.

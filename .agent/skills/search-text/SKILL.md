@@ -1,11 +1,14 @@
 ---
 id: search-text
+namespaced_id: alpha.search-text
 modes: code, plan, run, ask, troubleshoot, analysis
 priority: 7
 tools: search_text
 ---
 
 # search_text
+
+Project skill diagnostic name: **alpha.search-text**. Runtime tool contract: `search_text`.
 
 Read-only exact text search inside the open project workspace.
 

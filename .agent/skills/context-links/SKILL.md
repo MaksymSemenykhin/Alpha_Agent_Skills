@@ -1,10 +1,13 @@
 ---
 id: context-links
+namespaced_id: alpha.context-links
 modes: code, plan, run, git, analysis, ask
 priority: 8
 ---
 
 # Project context links (Связи)
+
+Project skill diagnostic name: **alpha.context-links**. Runtime tool contract when memory changes are explicitly requested: `manage_context_link`.
 
 Project memory: **associations** the engine stores between named things — entities, task patterns (`modify:…`), symbols, repo paths, multi-endpoint pairs, and whatever else the project records. File: `.agent/context/entity-links.json`. UI: **Связи**.
 
